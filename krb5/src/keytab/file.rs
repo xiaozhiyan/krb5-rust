@@ -41,18 +41,18 @@ impl FileData {
     fn entries_iter(&mut self) -> anyhow::Result<EntriesIter> {
         let path = Path::new(&self.name);
         if !path.try_exists()? {
-            return Err(anyhow::anyhow!("No such file or directory"));
+            Err(anyhow::anyhow!("No such file or directory"))?;
         }
 
         let mut reader = BufReader::new(File::open(path)?);
         let mut buf = [0; size_of::<Vno>()];
         if reader.read(&mut buf)? != size_of::<Vno>() {
-            return Err(KRB5_KEYTAB_BADVNO)?;
+            Err(KRB5_KEYTAB_BADVNO)?;
         }
 
         self.version = Vno::from_be_bytes(buf);
         if ![KRB5_KT_VNO, KRB5_KT_VNO_1].contains(&self.version) {
-            return Err(KRB5_KEYTAB_BADVNO)?;
+            Err(KRB5_KEYTAB_BADVNO)?;
         }
 
         Ok(EntriesIter {
