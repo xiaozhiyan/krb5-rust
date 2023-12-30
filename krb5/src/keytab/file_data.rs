@@ -1,5 +1,5 @@
 use super::{downcast_data, Keytab, KeytabData, KeytabEntry, Ops};
-use crate::{error::KRB5_KEYTAB_BADVNO, Keyblock, Principal, Timestamp};
+use crate::{Enctype, Error, Keyblock, Principal, Timestamp};
 use std::{
     fs::File,
     io::{BufReader, Read, Seek},
@@ -47,12 +47,12 @@ impl FileData {
         let mut reader = BufReader::new(File::open(path)?);
         let mut buf = [0; size_of::<Vno>()];
         if reader.read(&mut buf)? != size_of::<Vno>() {
-            Err(KRB5_KEYTAB_BADVNO)?;
+            Err(Error::KRB5_KEYTAB_BADVNO)?;
         }
 
         self.version = Vno::from_be_bytes(buf);
         if ![KRB5_KT_VNO, KRB5_KT_VNO_1].contains(&self.version) {
-            Err(KRB5_KEYTAB_BADVNO)?;
+            Err(Error::KRB5_KEYTAB_BADVNO)?;
         }
 
         Ok(EntriesIter {
@@ -178,7 +178,7 @@ impl<'a> EntriesIter<'a> {
         };
 
         let key = Keyblock {
-            enctype: enctype.into(),
+            enctype: Enctype(enctype.into()),
             contents: key_contents,
         };
 

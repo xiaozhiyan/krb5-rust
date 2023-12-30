@@ -1,2 +1,3 @@
-pub mod str_conv;
-pub mod unparse;
+mod str_conv;
+
+pub use str_conv::StrConv;

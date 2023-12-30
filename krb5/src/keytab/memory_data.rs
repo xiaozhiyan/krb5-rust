@@ -24,7 +24,7 @@ fn resolve(name: &str) -> anyhow::Result<Arc<Mutex<Keytab>>> {
         .next()
         .map(Arc::clone);
     let keytab = keytab.unwrap_or_else(|| {
-        let keytab = Arc::new(Mutex::new(create_keytab(name)));
+        let keytab = Arc::new(Mutex::new(create_memory_keytab(name)));
         MEMORY_KEYTABS
             .lock()
             .unwrap()
@@ -34,7 +34,7 @@ fn resolve(name: &str) -> anyhow::Result<Arc<Mutex<Keytab>>> {
     Ok(keytab)
 }
 
-fn create_keytab(name: &str) -> Keytab {
+fn create_memory_keytab(name: &str) -> Keytab {
     let data = MemoryData {
         name: name.to_owned(),
         entries: vec![],

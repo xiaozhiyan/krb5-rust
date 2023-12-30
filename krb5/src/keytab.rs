@@ -1,14 +1,13 @@
-mod file;
-mod memory;
+mod file_data;
+mod keytab_entry;
+mod memory_data;
 
+pub use self::keytab_entry::{KeytabEntry, Kvno};
 use self::{
-    file::{FileData, DFL_OPS, KTF_OPS, KTF_WRITABLE_OPS},
-    memory::{MemoryData, MKT_OPS},
+    file_data::{FileData, DFL_OPS, KTF_OPS, KTF_WRITABLE_OPS},
+    memory_data::{MemoryData, MKT_OPS},
 };
-use crate::{
-    error::{KRB5_KT_NAME_TOOLONG, KRB5_KT_UNKNOWN_TYPE},
-    Keyblock, Kvno, Principal, Timestamp,
-};
+use crate::Error;
 use std::sync::{Arc, Mutex};
 
 const OPS_LIST: [&Ops; 3] = [KTF_OPS, KTF_WRITABLE_OPS, MKT_OPS];
@@ -48,13 +47,13 @@ impl Keytab {
         };
         match OPS_LIST.iter().filter(|ops| ops.prefix == prefix).next() {
             Some(ops) => (ops.resolve)(real_name),
-            None => Err(KRB5_KT_UNKNOWN_TYPE)?,
+            None => Err(Error::KRB5_KT_UNKNOWN_TYPE)?,
         }
     }
 
     pub fn get_name(&self, length: usize) -> anyhow::Result<String> {
         match format!("{}:{}", self.ops.prefix, self.data.name()) {
-            name if name.len() > length => Err(KRB5_KT_NAME_TOOLONG)?,
+            name if name.len() > length => Err(Error::KRB5_KT_NAME_TOOLONG)?,
             name => Ok(name),
         }
     }
@@ -64,14 +63,6 @@ impl Keytab {
     ) -> anyhow::Result<Box<dyn Iterator<Item = anyhow::Result<Arc<KeytabEntry>>> + 'a>> {
         (self.ops.entries_iter)(self)
     }
-}
-
-#[derive(Debug)]
-pub struct KeytabEntry {
-    pub principal: Principal,
-    pub timestamp: Timestamp,
-    pub vno: Kvno,
-    pub key: Keyblock,
 }
 
 #[derive(Debug)]

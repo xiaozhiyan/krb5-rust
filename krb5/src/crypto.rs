@@ -1,1 +1,3 @@
-pub mod krb;
+mod krb;
+
+pub use self::krb::{Enctype, Keyblock};

@@ -1,11 +1,6 @@
 use chrono::{DateTime, TimeZone, Utc};
 use clap::{CommandFactory, Parser};
-use krb5::{
-    crypto::krb::enctype_util::{deprecated_enctype, enctype_to_name},
-    keytab::Keytab,
-    krb::{str_conv::timestamp_to_sfstring, unparse::unparse_name},
-    prefix_progname_to_error_if_needed, Enctype, BUFSIZ,
-};
+use krb5::{prefix_progname_to_error_if_needed, Enctype, Keytab, StrConv, BUFSIZ};
 use once_cell::sync::Lazy;
 use std::process::ExitCode;
 
@@ -13,7 +8,7 @@ const PROGNAME: &str = "klist";
 
 static ARGS: Lazy<Args> = Lazy::new(Args::parse);
 static NOW: Lazy<DateTime<Utc>> = Lazy::new(Utc::now);
-static TIMESTAMP_WIDTH: Lazy<usize> = Lazy::new(|| timestamp_to_sfstring(*NOW).len());
+static TIMESTAMP_WIDTH: Lazy<usize> = Lazy::new(|| StrConv::timestamp_to_sfstring(*NOW).len());
 
 #[derive(Parser)]
 #[command(name = PROGNAME, version)]
@@ -197,12 +192,14 @@ fn do_keytab(name: Option<&str>) -> anyhow::Result<()> {
         .transpose()
         .map_err(|e| anyhow::anyhow!("{} while scanning keytab", e))?
     {
-        let pname = unparse_name(&entry.principal)
+        let pname = entry
+            .principal
+            .unparse_name()
             .map_err(|e| anyhow::anyhow!("{} while unparsing principal name", e))?;
         print!("{:>4} ", entry.vno);
         if ARGS.show_time {
             let timestamp = Utc.timestamp_opt(entry.timestamp.into(), 0).unwrap();
-            print!("{} ", timestamp_to_sfstring(timestamp));
+            print!("{} ", StrConv::timestamp_to_sfstring(timestamp));
         }
         print!("{}", pname);
         if ARGS.show_etype {
@@ -225,10 +222,7 @@ fn do_keytab(name: Option<&str>) -> anyhow::Result<()> {
 }
 
 fn etype_string(enctype: Enctype) -> anyhow::Result<String> {
-    let mut name = enctype_to_name(enctype, false)?.to_owned();
-    if deprecated_enctype(enctype) {
-        name = format!("DEPRECATED:{}", name)
-    }
+    let mut name = enctype.deprecated_name(false)?;
     if name.len() > 100 {
         name = name[..100].to_owned()
     }

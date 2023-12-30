@@ -1,7 +1,5 @@
 mod krb5_error;
 
-pub use self::krb5_error::*;
-
 pub type ErrorCode = i32;
 
 #[derive(Debug)]
@@ -20,7 +18,7 @@ impl std::error::Error for Error {}
 
 macro_rules! error {
     ($error:ident, $code:expr, $message:expr) => {
-        pub const $error: &Error = &Error {
+        pub const $error: &'static Error = &Error {
             code: $code,
             message: $message,
         };
