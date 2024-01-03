@@ -2,7 +2,7 @@ use super::{downcast_data, Keytab, KeytabData, KeytabEntry, Ops};
 use crate::{Enctype, Error, Keyblock, Principal, Timestamp};
 use std::{
     fs::File,
-    io::{BufReader, Read, Seek},
+    io::{BufReader, Read, Seek, SeekFrom},
     marker::PhantomData,
     mem::size_of,
     path::Path,
@@ -200,6 +200,9 @@ impl<'a> EntriesIter<'a> {
                 entry.vno = vno32;
             }
         }
+
+        self.reader
+            .seek(SeekFrom::Start(start_position + size as u64))?;
 
         Ok(Some(Arc::new(entry)))
     }
