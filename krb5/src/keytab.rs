@@ -7,9 +7,14 @@ use self::{
     file_data::{FileData, DFL_OPS, KTF_OPS, KTF_WRITABLE_OPS},
     memory_data::{MemoryData, MKT_OPS},
 };
-use crate::Error;
-use std::sync::{Arc, Mutex};
+use crate::{Conf, Context, Error};
+use std::{
+    env,
+    sync::{Arc, Mutex},
+};
 
+const DEFKTNAME: &str = "FILE:/etc/krb5.keytab";
+const DEFCKTNAME: &str = "FILE:/usr/local/var/krb5/user/%{euid}/client.keytab";
 const OPS_LIST: [&Ops; 3] = [KTF_OPS, KTF_WRITABLE_OPS, MKT_OPS];
 
 #[derive(Debug)]
@@ -19,22 +24,46 @@ pub struct Keytab {
 }
 
 impl Keytab {
-    pub fn client_default_name() -> anyhow::Result<String> {
-        // TODO
-        todo!("Keytab::client_default_name")
+    pub fn client_default_name(context: &Context) -> anyhow::Result<String> {
+        match (context.profile_secure, env::var("KRB5_CLIENT_KTNAME")) {
+            (false, Ok(name)) => return Ok(name),
+            _ => (),
+        }
+        let name = context
+            .profile
+            .get_string(&format!(
+                "{}.{}",
+                Conf::LIBDEFAULTS,
+                Conf::DEFAULT_CLIENT_KEYTAB_NAME
+            ))
+            .unwrap_or(DEFCKTNAME.to_owned());
+        let name = Context::expand_path_tokens(&name)?;
+        Ok(name)
     }
 
-    pub fn default_name() -> anyhow::Result<String> {
-        // TODO
-        todo!("Keytab::default_name")
+    pub fn default_name(context: &Context) -> anyhow::Result<String> {
+        match (context.profile_secure, env::var("KRB5_KTNAME")) {
+            (false, Ok(name)) => return Ok(name),
+            _ => (),
+        }
+        let name = context
+            .profile
+            .get_string(&format!(
+                "{}.{}",
+                Conf::LIBDEFAULTS,
+                Conf::DEFAULT_KEYTAB_NAME
+            ))
+            .unwrap_or(DEFKTNAME.to_owned());
+        let name = Context::expand_path_tokens(&name)?;
+        Ok(name)
     }
 
-    pub fn client_default() -> anyhow::Result<Arc<Mutex<Self>>> {
-        Self::resolve(&Self::client_default_name()?)
+    pub fn client_default(context: &Context) -> anyhow::Result<Arc<Mutex<Self>>> {
+        Self::resolve(&Self::client_default_name(context)?)
     }
 
-    pub fn default() -> anyhow::Result<Arc<Mutex<Self>>> {
-        Self::resolve(&Self::default_name()?)
+    pub fn default(context: &Context) -> anyhow::Result<Arc<Mutex<Self>>> {
+        Self::resolve(&Self::default_name(context)?)
     }
 
     pub fn resolve(name: &str) -> anyhow::Result<Arc<Mutex<Self>>> {

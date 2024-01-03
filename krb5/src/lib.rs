@@ -1,3 +1,4 @@
+mod context;
 mod crypto;
 mod error;
 mod keytab;
@@ -5,6 +6,7 @@ mod krb;
 mod principal;
 
 pub use self::{
+    context::{Conf, Context},
     crypto::{Enctype, Keyblock},
     error::{Error, ErrorCode},
     keytab::{Keytab, KeytabEntry, Kvno},

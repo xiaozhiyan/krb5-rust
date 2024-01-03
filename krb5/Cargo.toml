@@ -11,4 +11,6 @@ license.workspace = true
 anyhow.workspace = true
 chrono.workspace = true
 clap.workspace = true
+config.workspace = true
 once_cell.workspace = true
+whoami.workspace = true

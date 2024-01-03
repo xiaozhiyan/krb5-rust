@@ -1,6 +1,6 @@
 use chrono::{DateTime, TimeZone, Utc};
 use clap::{CommandFactory, Parser};
-use krb5::{prefix_progname_to_error_if_needed, Enctype, Keytab, StrConv, BUFSIZ};
+use krb5::{prefix_progname_to_error_if_needed, Context, Enctype, Keytab, StrConv, BUFSIZ};
 use once_cell::sync::Lazy;
 use std::process::ExitCode;
 
@@ -109,7 +109,7 @@ fn run() -> anyhow::Result<()> {
     // Forces the evaluation of lazy static value `NOW` to use current time
     let _ = *NOW;
 
-    // TODO: `krb5_init_context`
+    let context = Context::init().map_err(|e| anyhow::anyhow!("{} while initializing krb5", e))?;
 
     if ARGS.name.is_some() && mode != Mode::KEYTAB {
         // TODO: `krb5_cc_set_default_name`
@@ -126,7 +126,7 @@ fn run() -> anyhow::Result<()> {
             return do_ccache();
         }
         Mode::KEYTAB => {
-            return do_keytab(ARGS.name.as_deref());
+            return do_keytab(&context, ARGS.name.as_deref());
         }
     }
 }
@@ -150,13 +150,12 @@ fn do_ccache() -> anyhow::Result<()> {
     todo!("klist::do_ccache")
 }
 
-fn do_keytab(name: Option<&str>) -> anyhow::Result<()> {
+fn do_keytab(context: &Context, name: Option<&str>) -> anyhow::Result<()> {
     let keytab = match (name, ARGS.use_client_keytab) {
-        (None, true) => Keytab::client_default()
+        (None, true) => Keytab::client_default(context)
             .map_err(|e| anyhow::anyhow!("{} while getting default client keytab", e))?,
-        (None, false) => {
-            Keytab::default().map_err(|e| anyhow::anyhow!("{} while getting default keytab", e))?
-        }
+        (None, false) => Keytab::default(context)
+            .map_err(|e| anyhow::anyhow!("{} while getting default keytab", e))?,
         (Some(name), _) => Keytab::resolve(name)
             .map_err(|e| anyhow::anyhow!("{} while resolving keytab {}", e, name))?,
     };

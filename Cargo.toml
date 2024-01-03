@@ -11,8 +11,10 @@ repository = "https://github.com/innorealm/krb5-rust"
 license = "MIT"
 
 [workspace.dependencies]
-anyhow = "1.0.77"
+anyhow = "1.0.79"
 chrono = "0.4.31"
 clap = { version = "4.4.12", features = ["derive"] }
+config = "0.13.4"
 krb5 = { path = "krb5", version = "0.0.1" }
 once_cell = "1.19.0"
+whoami = "1.4.1"
