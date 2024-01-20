@@ -67,15 +67,15 @@ impl Keytab {
     }
 
     pub fn resolve(name: &str) -> anyhow::Result<Arc<Mutex<Self>>> {
-        let (prefix, real_name) = match name.split_once(':') {
+        let (prefix, residual) = match name.split_once(':') {
             None => return (DFL_OPS.resolve)(name),
             // Use `FILE` when prefix is a drive letter
             Some((p, _)) if p.len() == 1 && p.as_bytes()[0].is_ascii_alphabetic() => ("FILE", name),
             Some(_) if name.starts_with('/') => ("FILE", name),
-            Some((prefix, real_name)) => (prefix, real_name),
+            Some((prefix, residual)) => (prefix, residual),
         };
         match OPS_LIST.iter().filter(|ops| ops.prefix == prefix).next() {
-            Some(ops) => (ops.resolve)(real_name),
+            Some(ops) => (ops.resolve)(residual),
             None => Err(Error::KRB5_KT_UNKNOWN_TYPE)?,
         }
     }

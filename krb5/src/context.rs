@@ -1,10 +1,16 @@
 mod profile;
 
 use self::profile::Profile;
+use crate::{Error, Flags};
+use nix::unistd::{Uid, User};
 
 const DEFAULT_CLOCKSKEW: i32 = 300;
-const KDC_OPT_RENEWABLE_OK: i32 = 0x00000010;
+const KDC_OPT_RENEWABLE_OK: Flags = 0x00000010;
 const DEFAULT_CCACHE_TYPE: i32 = 4;
+const DEFAULT_KDC_TIMESYNC: i32 = 1;
+const KRB5_LIBOPT_SYNC_KDCTIME: Flags = 0x0001;
+const KRB5_OS_TOFFSET_VALID: Flags = 1;
+const KRB5_OS_TOFFSET_TIME: Flags = 2;
 
 #[derive(Debug)]
 pub enum DnsCanonicalizeHostname {
@@ -27,12 +33,14 @@ impl Conf {
     conf!(ALLOW_WEAK_CRYPTO, "allow_weak_crypto");
     conf!(CCACHE_TYPE, "ccache_type");
     conf!(CLOCKSKEW, "clockskew");
+    conf!(DEFAULT_CCACHE_NAME, "default_ccache_name");
     conf!(DEFAULT_CLIENT_KEYTAB_NAME, "default_client_keytab_name");
     conf!(DEFAULT_KEYTAB_NAME, "default_keytab_name");
     conf!(DNS_CANONICALIZE_HOSTNAME, "dns_canonicalize_hostname");
     conf!(ENFORCE_OK_AS_DELEGATE, "enforce_ok_as_delegate");
     conf!(IGNORE_ACCEPTOR_HOSTNAME, "ignore_acceptor_hostname");
     conf!(KDC_DEFAULT_OPTIONS, "kdc_default_options");
+    conf!(KDC_TIMESYNC, "kdc_timesync");
     conf!(LIBDEFAULTS, "libdefaults");
     conf!(REQUEST_TIMEOUT, "request_timeout");
 }
@@ -43,7 +51,8 @@ pub struct Context {
     pub profile: Profile,
     pub clockskew: i32,
     pub req_timeout: i32,
-    pub kdc_default_options: i32,
+    pub kdc_default_options: Flags,
+    pub library_options: Flags,
     pub profile_secure: bool,
     pub fcc_default_format: i32,
     pub prompt_types: i32,
@@ -94,6 +103,13 @@ impl Context {
         let kdc_default_options =
             Self::get_int(&profile, Conf::KDC_DEFAULT_OPTIONS, KDC_OPT_RENEWABLE_OK);
 
+        let library_options =
+            if Self::get_int(&profile, Conf::KDC_TIMESYNC, DEFAULT_KDC_TIMESYNC) > 0 {
+                KRB5_LIBOPT_SYNC_KDCTIME
+            } else {
+                0
+            };
+
         let fcc_default_format =
             Self::get_int(&profile, Conf::CCACHE_TYPE, DEFAULT_CCACHE_TYPE) + 0x0500;
 
@@ -103,6 +119,7 @@ impl Context {
             clockskew,
             req_timeout,
             kdc_default_options,
+            library_options,
             profile_secure: secure,
             fcc_default_format,
             prompt_types: 0,
@@ -180,10 +197,30 @@ impl Context {
 
     fn expand_token(token: &str) -> anyhow::Result<String> {
         let token_value = match token {
-            "uid" | "euid" | "USERID" => whoami::username(),
+            "euid" => Uid::effective().to_string(),
+            "username" => User::from_uid(Uid::effective())?
+                .map(|u| u.name)
+                .unwrap_or_else(|| Uid::effective().to_string()),
+            "uid" | "USERID" => Uid::current().to_string(),
             _ => Err(anyhow::anyhow!("Invalid argument"))?,
         };
         Ok(token_value)
+    }
+
+    pub fn set_default_ccname(&mut self, name: &str) {
+        self.os_context.default_ccname = Some(name.to_owned())
+    }
+
+    pub fn sync_kdctime(&self) -> bool {
+        self.library_options & KRB5_LIBOPT_SYNC_KDCTIME > 0
+    }
+
+    pub fn get_default_realm(&mut self) -> anyhow::Result<Vec<u8>> {
+        if !self.default_realm.is_empty() {
+            return Ok(self.default_realm.to_owned());
+        }
+        // TODO: get from hostrealm modules
+        Err(Error::KRB5_CONFIG_NODEFREALM)?
     }
 }
 
@@ -191,8 +228,8 @@ impl Context {
 pub struct OsContext {
     pub time_offset: i32,
     pub usec_offset: i32,
-    pub os_flags: i32,
-    pub default_ccname: &'static str,
+    pub os_flags: Flags,
+    pub default_ccname: Option<String>,
 }
 
 impl OsContext {
@@ -201,7 +238,15 @@ impl OsContext {
             time_offset: 0,
             usec_offset: 0,
             os_flags: 0,
-            default_ccname: "",
+            default_ccname: None,
         }
+    }
+
+    pub fn time_offset_valid(&self) -> bool {
+        self.os_flags & KRB5_OS_TOFFSET_VALID > 1
+    }
+
+    pub fn set_time_offset_valid(&mut self) {
+        self.os_flags = self.os_flags & !KRB5_OS_TOFFSET_TIME | KRB5_OS_TOFFSET_VALID;
     }
 }

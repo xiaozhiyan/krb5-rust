@@ -1,5 +1,9 @@
 use super::{downcast_data, Keytab, KeytabData, KeytabEntry, Ops};
-use std::sync::{Arc, Mutex};
+use once_cell::sync::Lazy;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 pub(super) const MKT_OPS: &Ops = &Ops {
     prefix: "MEMORY",
@@ -7,7 +11,8 @@ pub(super) const MKT_OPS: &Ops = &Ops {
     entries_iter,
 };
 
-static MEMORY_KEYTABS: Mutex<Vec<Arc<Mutex<Keytab>>>> = Mutex::new(vec![]);
+static MEMORY_KEYTABS: Lazy<Mutex<HashMap<String, Arc<Mutex<Keytab>>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Debug)]
 pub(super) struct MemoryData {
@@ -18,19 +23,20 @@ pub(super) struct MemoryData {
 fn resolve(name: &str) -> anyhow::Result<Arc<Mutex<Keytab>>> {
     let keytab = MEMORY_KEYTABS
         .lock()
-        .unwrap()
-        .iter()
-        .filter(|k| k.lock().unwrap().data.name() == name)
-        .next()
+        .map_err(|e| anyhow::anyhow!("{}", e))?
+        .get(name)
         .map(Arc::clone);
-    let keytab = keytab.unwrap_or_else(|| {
-        let keytab = Arc::new(Mutex::new(create_memory_keytab(name)));
-        MEMORY_KEYTABS
-            .lock()
-            .unwrap()
-            .insert(0, Arc::clone(&keytab));
-        keytab
-    });
+    let keytab = match keytab {
+        Some(keytab) => keytab,
+        None => {
+            let keytab = Arc::new(Mutex::new(create_memory_keytab(name)));
+            MEMORY_KEYTABS
+                .lock()
+                .map_err(|e| anyhow::anyhow!("{}", e))?
+                .insert(name.to_owned(), Arc::clone(&keytab));
+            keytab
+        }
+    };
     Ok(keytab)
 }
 

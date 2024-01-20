@@ -1,4 +1,5 @@
 use super::Enctype;
+use crate::Flags;
 
 const MAX_ENCTYPE_ALIASES: usize = 2;
 const ENCTYPE_WEAK: Flags = 1 << 0;
@@ -66,8 +67,6 @@ const KEYTYPES: [Keytype; 10] = [
         flags: 0,
     },
 ];
-
-type Flags = i32;
 
 pub struct Keytype {
     enctype: Enctype,
